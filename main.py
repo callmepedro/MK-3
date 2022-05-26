@@ -44,32 +44,60 @@ def cnt_pixels(frame, cur_mask):
     return p_cnt
 
 
+def cnt_colors(frame):
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    colors_cnt = [0] * 7
+    for i in range(borders[0][2] + 1, borders[0][3]):
+        for j in range(borders[0][0] + 1, borders[0][1] + 1):
+            if hsv[i][j][1] < 60 or hsv[i][j][2] < 60:
+                continue
+            if 0 <= hsv[i][j][0] <= 14 or 170 <= hsv[i][j][0] <= 179:
+                colors_cnt[0] += 1
+            if 15 <= hsv[i][j][0] <= 20:
+                colors_cnt[1] += 1
+            if 21 <= hsv[i][j][0] <= 35:
+                colors_cnt[2] += 1
+            if 36 <= hsv[i][j][0] <= 79:
+                colors_cnt[3] += 1
+            if 80 <= hsv[i][j][0] <= 100:
+                colors_cnt[4] += 1
+            if 101 <= hsv[i][j][0] <= 133:
+                colors_cnt[5] += 1
+            if 134 <= hsv[i][j][0] <= 169:
+                colors_cnt[6] += 1
+
+    return colors_cnt
+
+
 def get_color(frame):
     pixels_count = (borders[0][3] - borders[0][2]) * (borders[0][1] - borders[0][0])
 
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    # hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    #
+    # red_mask = cv2.inRange(hsv, red_light, red_dark)
+    # orange_mask = cv2.inRange(hsv, orange_light, orange_dark)
+    # yellow_mask = cv2.inRange(hsv, yellow_light, yellow_dark)
+    # green_mask = cv2.inRange(hsv, green_light, green_dark)
+    # blue_mask = cv2.inRange(hsv, blue_light, blue_dark)
+    # darkblue_mask = cv2.inRange(hsv, darkblue_light, darkblue_dark)
+    # purple_mask = cv2.inRange(hsv, purple_light, purple_dark)
+    # red2_mask = cv2.inRange(hsv, red2_light, red2_dark)
+    #
+    # all_colors_cnt = [0] * 7
+    # all_colors_cnt[0] += cnt_pixels(frame, red_mask)
+    # all_colors_cnt[1] += cnt_pixels(frame, orange_mask)
+    # all_colors_cnt[2] += cnt_pixels(frame, yellow_mask)
+    # all_colors_cnt[3] += cnt_pixels(frame, green_mask)
+    # all_colors_cnt[4] += cnt_pixels(frame, blue_mask)
+    # all_colors_cnt[5] += cnt_pixels(frame, darkblue_mask)
+    # all_colors_cnt[6] += cnt_pixels(frame, purple_mask)
+    # all_colors_cnt[0] += cnt_pixels(frame, red2_mask)
 
-    red_mask = cv2.inRange(hsv, red_light, red_dark)
-    orange_mask = cv2.inRange(hsv, orange_light, orange_dark)
-    yellow_mask = cv2.inRange(hsv, yellow_light, yellow_dark)
-    green_mask = cv2.inRange(hsv, green_light, green_dark)
-    blue_mask = cv2.inRange(hsv, blue_light, blue_dark)
-    darkblue_mask = cv2.inRange(hsv, darkblue_light, darkblue_dark)
-    purple_mask = cv2.inRange(hsv, purple_light, purple_dark)
-    red2_mask = cv2.inRange(hsv, red2_light, red2_dark)
-
-    all_colors_cnt = [0] * 7
-    all_colors_cnt[0] += cnt_pixels(frame, red_mask)
-    all_colors_cnt[1] += cnt_pixels(frame, orange_mask)
-    all_colors_cnt[2] += cnt_pixels(frame, yellow_mask)
-    all_colors_cnt[3] += cnt_pixels(frame, green_mask)
-    all_colors_cnt[4] += cnt_pixels(frame, blue_mask)
-    all_colors_cnt[5] += cnt_pixels(frame, darkblue_mask)
-    all_colors_cnt[6] += cnt_pixels(frame, purple_mask)
-    all_colors_cnt[0] += cnt_pixels(frame, red2_mask)
+    all_colors_cnt = cnt_colors(frame)
 
     if max(all_colors_cnt) / pixels_count <= 0.15:
-        return "nothing"
+        return ""
 
     color_idx = all_colors_cnt.index(max(all_colors_cnt))
     if color_idx == 0:
@@ -90,21 +118,33 @@ def get_color(frame):
 
 cap = cv2.VideoCapture(0)
 
+text_on = ""
 cnt = 0
 while True:
     ret, frame = cap.read()
-    frame = np.array(frame)
+    frame = np.asarray(frame)
+
+    if cnt % 15 == 0:
+        text_on = get_color(frame)
 
     cv2.rectangle(frame, (padding, padding), (wd3 - padding, frame.shape[0]-padding), border_colors.tolist()[0], thickness)
     cv2.rectangle(frame, (wd3 + padding, padding), (2 * wd3 - padding, frame.shape[0]-padding), border_colors.tolist()[1], thickness)
     cv2.rectangle(frame, (2 * wd3 + padding, padding), (3 * wd3 - padding, frame.shape[0]-padding), border_colors.tolist()[2], thickness)
 
-    if cnt % 25 == 0:
-        print(get_color(frame))
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    cv2.putText(frame,
+                text_on,
+                (borders[0][0] + 40, 50),
+                font, 1,
+                (255, 255, 255),
+                2,
+                cv2.LINE_4)
 
     cv2.imshow('frame', frame)
 
     cnt += 1
+    if cnt > 10000: cnt = 0
+
     pressed_key = cv2.waitKey(1)
     if pressed_key == ord(' '):
         border_colors = np.roll(border_colors, 1, axis=0)
