@@ -1,31 +1,58 @@
 import cv2
 import numpy as np
 
+def gstreamer_pipeline(
+    capture_width=1280,
+    capture_height=720,
+    display_width=1280,
+    display_height=720,
+    framerate=30,
+    flip_method=0,
+):
+    return (
+        "nvarguscamerasrc ! "
+        "video/x-raw(memory:NVMM), "
+        "width=(int)%d, height=(int)%d, "
+        "format=(string)NV12, framerate=(fraction)%d/1 ! "
+        "nvvidconv flip-method=%d ! "
+        "video/x-raw, width=(int)%d, height=(int)%d, format=(string)BGRx ! "
+        "videoconvert ! "
+        "video/x-raw, format=(string)BGR ! appsink max-buffers=1 drop=true"
+        % (
+            capture_width,
+            capture_height,
+            framerate,
+            flip_method,
+            display_width,
+            display_height,
+        )
+    )
+
 
 width = 640
 height = 480
 wd3 = width // 3
-padding = 10
+padding = 15
 bc_active = (0, 255, 0)
 bc_inactive = (0, 0, 255)
 thickness = 2
 
-red_light = np.array([0, 60, 60])
-red_dark = np.array([14, 255, 255])
-orange_light = np.array([15, 60, 60])
-orange_dark = np.array([20, 255, 255])
-yellow_light = np.array([20, 60, 60])
-yellow_dark = np.array([35, 255, 255])
-green_light = np.array([36, 60, 60])
-green_dark = np.array([74, 255, 255])
-blue_light = np.array([75, 60, 60])
-blue_dark = np.array([100, 255, 255])
-darkblue_light = np.array([101, 60, 60])
-darkblue_dark = np.array([133, 255, 255])
-purple_light = np.array([134, 60, 60])
-purple_dark = np.array([169, 255, 255])
-red2_light = np.array([170, 60, 60])
-red2_dark = np.array([179, 255, 255])
+# red_light = np.array([0, 60, 60])
+# red_dark = np.array([14, 255, 255])
+# orange_light = np.array([15, 60, 60])
+# orange_dark = np.array([20, 255, 255])
+# yellow_light = np.array([20, 60, 60])
+# yellow_dark = np.array([35, 255, 255])
+# green_light = np.array([36, 60, 60])
+# green_dark = np.array([74, 255, 255])
+# blue_light = np.array([75, 60, 60])
+# blue_dark = np.array([100, 255, 255])
+# darkblue_light = np.array([101, 60, 60])
+# darkblue_dark = np.array([133, 255, 255])
+# purple_light = np.array([134, 60, 60])
+# purple_dark = np.array([169, 255, 255])
+# red2_light = np.array([170, 60, 60])
+# red2_dark = np.array([179, 255, 255])
 
 border_colors = np.array([bc_active, bc_inactive, bc_inactive])
 
@@ -116,7 +143,7 @@ def get_color(frame):
         return "purple"
 
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(gstreamer_pipeline(flip_method=4), cv2.CAP_GSTREAMER)
 
 text_on = ""
 cnt = 0
@@ -134,7 +161,7 @@ while True:
     font = cv2.FONT_HERSHEY_SIMPLEX
     cv2.putText(frame,
                 text_on,
-                (borders[0][0] + 40, 50),
+                (borders[0][0], 50),
                 font, 1,
                 (255, 255, 255),
                 2,
