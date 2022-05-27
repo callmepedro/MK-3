@@ -1,83 +1,62 @@
 import cv2
 import numpy as np
 
-def gstreamer_pipeline(
-    capture_width=1280,
-    capture_height=720,
-    display_width=1280,
-    display_height=720,
-    framerate=30,
-    flip_method=0,
-):
-    return (
-        "nvarguscamerasrc ! "
-        "video/x-raw(memory:NVMM), "
-        "width=(int)%d, height=(int)%d, "
-        "format=(string)NV12, framerate=(fraction)%d/1 ! "
-        "nvvidconv flip-method=%d ! "
-        "video/x-raw, width=(int)%d, height=(int)%d, format=(string)BGRx ! "
-        "videoconvert ! "
-        "video/x-raw, format=(string)BGR ! appsink max-buffers=1 drop=true"
-        % (
-            capture_width,
-            capture_height,
-            framerate,
-            flip_method,
-            display_width,
-            display_height,
-        )
-    )
-
 
 width = 640
 height = 480
-wd3 = width // 3
-padding = 15
-bc_active = (0, 255, 0)
-bc_inactive = (0, 0, 255)
-thickness = 2
 
-# red_light = np.array([0, 60, 60])
-# red_dark = np.array([14, 255, 255])
-# orange_light = np.array([15, 60, 60])
-# orange_dark = np.array([20, 255, 255])
-# yellow_light = np.array([20, 60, 60])
-# yellow_dark = np.array([35, 255, 255])
-# green_light = np.array([36, 60, 60])
-# green_dark = np.array([74, 255, 255])
-# blue_light = np.array([75, 60, 60])
-# blue_dark = np.array([100, 255, 255])
-# darkblue_light = np.array([101, 60, 60])
-# darkblue_dark = np.array([133, 255, 255])
-# purple_light = np.array([134, 60, 60])
-# purple_dark = np.array([169, 255, 255])
-# red2_light = np.array([170, 60, 60])
-# red2_dark = np.array([179, 255, 255])
-
-border_colors = np.array([bc_active, bc_inactive, bc_inactive])
-
-borders = [[padding, wd3 - padding, padding, height - padding],
-           [wd3 + padding, 2 * wd3 - padding, padding, height - padding],
-           [2 * wd3 + padding, 3 * wd3 - padding, padding, height - padding]]
+detect_frame_width = 80
+detect_frame_height = 80
+pixel_skip_factor = 2
 
 
-def cnt_pixels(frame, cur_mask):
-    frame_after = cv2.bitwise_and(frame, frame, mask=cur_mask)
-    p_cnt = 0
-    for i in range(borders[0][2] + 1, borders[0][3]):
-        for j in range(borders[0][0] + 1, borders[0][1] + 1):
-            if frame_after[i][j][1] != 0:
-                p_cnt += 1
-    return p_cnt
+def gstreamer_pipeline(
+        capture_width=width,
+        capture_height=height,
+        display_width=width,
+        display_height=height,
+        framerate=30,
+        flip_method=0,
+):
+    return (
+            "nvarguscamerasrc ! "
+            "video/x-raw(memory:NVMM), "
+            "width=(int)%d, height=(int)%d, "
+            "format=(string)NV12, framerate=(fraction)%d/1 ! "
+            "nvvidconv flip-method=%d ! "
+            "video/x-raw, width=(int)%d, height=(int)%d, format=(string)BGRx ! "
+            "videoconvert ! "
+            "video/x-raw, format=(string)BGR ! appsink max-buffers=1 drop=true"
+            % (
+                capture_width,
+                capture_height,
+                framerate,
+                flip_method,
+                display_width,
+                display_height,
+            )
+    )
+
+
+top_y = (height - detect_frame_height) // 2
+bottom_y = (height + detect_frame_height) // 2
+top_x1 = (width // 3 - detect_frame_width) // 2
+top_x2 = top_x1 + width // 3
+top_x3 = top_x2 + width // 3
+
+# top_left  top_right  bottom_left  bottom_right
+borders = [[top_x1, top_x1 + detect_frame_width, top_y, bottom_y],
+           [top_x2, top_x2 + detect_frame_width, top_y, bottom_y],
+           [top_x3, top_x3 + detect_frame_width, top_y, bottom_y]]
 
 
 def cnt_colors(frame):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
     colors_cnt = [0] * 7
-    for i in range(borders[0][2] + 1, borders[0][3]):
-        for j in range(borders[0][0] + 1, borders[0][1] + 1):
-            if hsv[i][j][1] < 60 or hsv[i][j][2] < 60:
+    for i in range(borders[0][2] + 1, borders[0][3], pixel_skip_factor):
+        for j in range(borders[0][0] + 1, borders[0][1] + 1, pixel_skip_factor):
+            if hsv[i][j][1] < 50 or hsv[i][j][2] < 50:
                 continue
             if 0 <= hsv[i][j][0] <= 14 or 170 <= hsv[i][j][0] <= 179:
                 colors_cnt[0] += 1
@@ -98,32 +77,11 @@ def cnt_colors(frame):
 
 
 def get_color(frame):
-    pixels_count = (borders[0][3] - borders[0][2]) * (borders[0][1] - borders[0][0])
-
-    # hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    #
-    # red_mask = cv2.inRange(hsv, red_light, red_dark)
-    # orange_mask = cv2.inRange(hsv, orange_light, orange_dark)
-    # yellow_mask = cv2.inRange(hsv, yellow_light, yellow_dark)
-    # green_mask = cv2.inRange(hsv, green_light, green_dark)
-    # blue_mask = cv2.inRange(hsv, blue_light, blue_dark)
-    # darkblue_mask = cv2.inRange(hsv, darkblue_light, darkblue_dark)
-    # purple_mask = cv2.inRange(hsv, purple_light, purple_dark)
-    # red2_mask = cv2.inRange(hsv, red2_light, red2_dark)
-    #
-    # all_colors_cnt = [0] * 7
-    # all_colors_cnt[0] += cnt_pixels(frame, red_mask)
-    # all_colors_cnt[1] += cnt_pixels(frame, orange_mask)
-    # all_colors_cnt[2] += cnt_pixels(frame, yellow_mask)
-    # all_colors_cnt[3] += cnt_pixels(frame, green_mask)
-    # all_colors_cnt[4] += cnt_pixels(frame, blue_mask)
-    # all_colors_cnt[5] += cnt_pixels(frame, darkblue_mask)
-    # all_colors_cnt[6] += cnt_pixels(frame, purple_mask)
-    # all_colors_cnt[0] += cnt_pixels(frame, red2_mask)
+    pixels_count = detect_frame_width * detect_frame_height // pixel_skip_factor**2
 
     all_colors_cnt = cnt_colors(frame)
 
-    if max(all_colors_cnt) / pixels_count <= 0.15:
+    if max(all_colors_cnt) / pixels_count <= 0.18:
         return ""
 
     color_idx = all_colors_cnt.index(max(all_colors_cnt))
@@ -143,25 +101,29 @@ def get_color(frame):
         return "purple"
 
 
-cap = cv2.VideoCapture(gstreamer_pipeline(flip_method=4), cv2.CAP_GSTREAMER)
+# cap = cv2.VideoCapture(gstreamer_pipeline(flip_method=4), cv2.CAP_GSTREAMER)
+cap = cv2.VideoCapture(0)
 
 text_on = ""
 cnt = 0
 while True:
+    cnt += 1
+
     ret, frame = cap.read()
     frame = np.asarray(frame)
 
-    if cnt % 15 == 0:
+    if cnt % 10 == 0:
         text_on = get_color(frame)
+        cnt = 0
 
-    cv2.rectangle(frame, (padding, padding), (wd3 - padding, frame.shape[0]-padding), border_colors.tolist()[0], thickness)
-    cv2.rectangle(frame, (wd3 + padding, padding), (2 * wd3 - padding, frame.shape[0]-padding), border_colors.tolist()[1], thickness)
-    cv2.rectangle(frame, (2 * wd3 + padding, padding), (3 * wd3 - padding, frame.shape[0]-padding), border_colors.tolist()[2], thickness)
+    cv2.rectangle(frame, (borders[0][0], borders[0][2]), (borders[0][1], borders[0][3]), (0, 255, 0), 2)
+    cv2.rectangle(frame, (borders[1][0], borders[1][2]), (borders[1][1], borders[1][3]), (0, 0, 255), 2)
+    cv2.rectangle(frame, (borders[2][0], borders[2][2]), (borders[2][1], borders[2][3]), (0, 0, 255), 2)
 
     font = cv2.FONT_HERSHEY_SIMPLEX
     cv2.putText(frame,
                 text_on,
-                (borders[0][0], 50),
+                (50, 50),
                 font, 1,
                 (255, 255, 255),
                 2,
@@ -169,12 +131,8 @@ while True:
 
     cv2.imshow('frame', frame)
 
-    cnt += 1
-    if cnt > 10000: cnt = 0
-
     pressed_key = cv2.waitKey(1)
     if pressed_key == ord(' '):
-        border_colors = np.roll(border_colors, 1, axis=0)
         borders = np.roll(borders, -1, axis=0)
     if pressed_key == ord('q'):
         break
